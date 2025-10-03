@@ -1,29 +1,31 @@
-# ---- Etapa 1: build (Maven) ----
+# syntax=docker/dockerfile:1
+
+# ---- Build ----
 FROM maven:3.9.6-eclipse-temurin-17 AS build
-WORKDIR /build
+WORKDIR /app
 
-# Copiamos el proyecto de Spring Boot
-COPY supervisor-backend/pom.xml .
-COPY supervisor-backend/src ./src
+# copia POM y código
+COPY pom.xml .
+COPY src ./src
 
-# Compilamos y generamos el JAR (sin tests)
-RUN mvn -B -DskipTests clean package
+# compilar (sin tests)
+RUN mvn -q -DskipTests=true clean package
 
-# ---- Etapa 2: run (JRE) ----
+# ---- Runtime ----
 FROM eclipse-temurin:17-jre
 WORKDIR /app
 
-# Copiamos el JAR construido
-COPY --from=build /build/target/*.jar /app/app.jar
+# copia el jar generado
+COPY --from=build /app/target/*.jar app.jar
 
-# (Opcional) tuning de memoria
-ENV JAVA_OPTS="-XX:+UseG1GC -XX:MaxRAMPercentage=75"
+# Render asigna PORT; Spring lo tomará por parámetro
+ENV PORT=8080
+EXPOSE 8080
 
-# Render te inyecta PORT; Spring debe escuchar ahí
-# Pasamos los props como args para sobreescribir application.properties
-CMD sh -c 'java $JAVA_OPTS -jar app.jar \
-  --server.port=${PORT:-3003} \
+# pasa tus props como args de línea (Spring los mapea a application.properties)
+CMD ["sh","-c","java -jar app.jar \
+  --server.port=${PORT} \
   --main.api.base=${MAIN_API_BASE} \
   --cors.origin=${CORS_ORIGIN} \
-  --cors.origins=${CORS_ORIGINS} \
-  --allowed.supervisor.emails=${ALLOWED_SUPERVISOR_EMAILS}'
+  --cors.origins=${CORS_ORIGINS:-} \
+  --allowed.supervisor.emails=${ALLOWED_SUPERVISOR_EMAILS}"]
