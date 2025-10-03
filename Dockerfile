@@ -4,25 +4,26 @@
 FROM maven:3.9.6-eclipse-temurin-17 AS build
 WORKDIR /app
 
-# copia POM y código
+# Copiamos POM y código
 COPY pom.xml .
 COPY src ./src
 
-# compilar (sin tests)
-RUN mvn -q -DskipTests=true clean package
+# Compilar y reempacar Boot Jar (fat jar)
+RUN mvn -q -DskipTests=true clean package spring-boot:repackage
 
 # ---- Runtime ----
 FROM eclipse-temurin:17-jre
 WORKDIR /app
 
-# copia el jar generado
+# Copiamos el jar resultante y lo nombramos app.jar
 COPY --from=build /app/target/*.jar app.jar
 
-# Render asigna PORT; Spring lo tomará por parámetro
+# Render setea PORT -> se lo pasamos a Spring
 ENV PORT=8080
 EXPOSE 8080
 
-# pasa tus props como args de línea (Spring los mapea a application.properties)
+# Propiedades que tu app lee (las pones como Env Vars en Render)
+# MAIN_API_BASE, CORS_ORIGIN, CORS_ORIGINS, ALLOWED_SUPERVISOR_EMAILS
 CMD ["sh","-c","java -jar app.jar \
   --server.port=${PORT} \
   --main.api.base=${MAIN_API_BASE} \
