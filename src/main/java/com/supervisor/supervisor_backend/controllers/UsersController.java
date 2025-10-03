@@ -18,8 +18,7 @@ public class UsersController {
     @GetMapping
     public ResponseEntity<String> listEngineers(HttpServletRequest req) {
         String auth = req.getHeader("Authorization");
-        //  antes: /user con params role=engineer (dejaba vacío)
-        //  ahora: trae todos los usuarios y el front los ordena A–Z
-        return proxy.get(auth, "/user", null);
+        // ✅ El backend grande expone /users (plural)
+        return proxy.get(auth, "/users", null);
     }
 }
