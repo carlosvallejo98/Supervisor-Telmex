@@ -1,25 +1,29 @@
-# Usamos Java 17
-FROM eclipse-temurin:17-jdk
+# ---- Etapa 1: build (Maven) ----
+FROM maven:3.9.6-eclipse-temurin-17 AS build
+WORKDIR /build
 
-# Creamos un directorio dentro del contenedor
+# Copiamos el proyecto de Spring Boot
+COPY supervisor-backend/pom.xml .
+COPY supervisor-backend/src ./src
+
+# Compilamos y generamos el JAR (sin tests)
+RUN mvn -B -DskipTests clean package
+
+# ---- Etapa 2: run (JRE) ----
+FROM eclipse-temurin:17-jre
 WORKDIR /app
 
-# Copiamos Maven wrapper y pom.xml primero (para cachear dependencias)
-COPY pom.xml .
-COPY mvnw .
-COPY .mvn .mvn
+# Copiamos el JAR construido
+COPY --from=build /build/target/*.jar /app/app.jar
 
-# Descargamos dependencias
-RUN ./mvnw dependency:go-offline -B
+# (Opcional) tuning de memoria
+ENV JAVA_OPTS="-XX:+UseG1GC -XX:MaxRAMPercentage=75"
 
-# Copiamos el resto del código fuente
-COPY src src
-
-# Construimos el .jar (saltamos tests para más rápido)
-RUN ./mvnw clean package -DskipTests
-
-# Render pone el puerto en la variable $PORT
-EXPOSE 8080
-
-# Arrancamos la app con el .jar que se generó en /target
-CMD ["java", "-jar", "target/*.jar"]
+# Render te inyecta PORT; Spring debe escuchar ahí
+# Pasamos los props como args para sobreescribir application.properties
+CMD sh -c 'java $JAVA_OPTS -jar app.jar \
+  --server.port=${PORT:-3003} \
+  --main.api.base=${MAIN_API_BASE} \
+  --cors.origin=${CORS_ORIGIN} \
+  --cors.origins=${CORS_ORIGINS} \
+  --allowed.supervisor.emails=${ALLOWED_SUPERVISOR_EMAILS}'
